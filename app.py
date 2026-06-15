@@ -97,11 +97,12 @@ REGIMES = ["MEI", "Simples Nacional", "Lucro Presumido", "Lucro Real", "Imune/Is
 SETORES = ["Sócio/Diretor", "Financeiro", "Fiscal", "Contábil", "DP/RH", "Outro"]
 ESTADOS = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]
 OPCOES_TTS = [
-    "TTS/CORREDOR DE IMPORTAÇÃO",
     "TTS/CD DE INDÚSTRIA DE OUTRA UF",
+    "TTS/CORREDOR DE IMPORTAÇÃO",
     "TTS/E-COMMERCE NÃO VINCULADO",
     "TTS/E-COMMERCE VINCULADO",
-    "TTS/Operador Logístico e TTS/Industria"
+    "TTS/INDUSTRIA",
+    "TTS/OPERADOR LOGÍSTICO"
 ]
 
 coluna_1_fisc = [
