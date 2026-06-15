@@ -96,12 +96,22 @@ st.divider()
 REGIMES = ["MEI", "Simples Nacional", "Lucro Presumido", "Lucro Real", "Imune/Isenta"]
 SETORES = ["Sócio/Diretor", "Financeiro", "Fiscal", "Contábil", "DP/RH", "Outro"]
 ESTADOS = ["AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", "RS", "RO", "RR", "SC", "SP", "SE", "TO"]
+OPCOES_TTS = [
+    "TTS/CORREDOR DE IMPORTAÇÃO",
+    "TTS/CD DE INDÚSTRIA DE OUTRA UF",
+    "TTS/E-COMMERCE NÃO VINCULADO",
+    "TTS/E-COMMERCE VINCULADO",
+    "TTS/Operador Logístico e TTS/Industria"
+]
 
 itens_fiscais = [
     "Escrituração de Notas Fiscais de Entrada",
     "Escrituração de Notas Fiscais de Saída",
     "Escrituração de Notas de Serviços Prestados",
     "Escrituração de Notas de Serviços Tomados",
+    "Emissão de notas fiscais de serviços",
+    "Emissão de notas fiscais eletrônicas de produtos",
+    "ICMS Incentivado",
     "Consultas Tributárias",
     "Dúvidas Tributárias",
     "Acompanhamento de CND Federal",
@@ -278,6 +288,19 @@ with tab3:
             elif item == "Escrituração de Notas Fiscais de Saída":
                 val = st.session_state.form_data.get("qtd_notas_saida", "")
                 st.session_state.form_data["qtd_notas_saida"] = col.text_input("Qtd média Saídas", value=val, key="in_qtd_sai")
+            elif item == "Emissão de notas fiscais de serviços":
+                val = st.session_state.form_data.get("qtd_emissao_notas_servico", "")
+                st.session_state.form_data["qtd_emissao_notas_servico"] = col.text_input("Qtd Emissão Serviços", value=val, key="in_qtd_emis_serv")
+            elif item == "Emissão de notas fiscais eletrônicas de produtos":
+                val = st.session_state.form_data.get("qtd_emissao_notas_produto", "")
+                st.session_state.form_data["qtd_emissao_notas_produto"] = col.text_input("Qtd Emissão Produtos", value=val, key="in_qtd_emis_prod")
+            elif item == "ICMS Incentivado":
+                selecionados = col.multiselect(
+                    "Selecione os incentivos (TTS):",
+                    options=OPCOES_TTS,
+                    default=st.session_state.form_data.get("tipos_icms_incentivado", [])
+                )
+                st.session_state.form_data["tipos_icms_incentivado"] = selecionados
             elif item == "Apuração: ICMS-ST":
                 estados_selecionados = col.multiselect(
                     "Estados ICMS-ST:",

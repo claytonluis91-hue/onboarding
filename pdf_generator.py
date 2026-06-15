@@ -136,6 +136,12 @@ class FichaClientePDF(FPDF):
                         texto_extra = f" (Quantidade Média: {dados_form.get('qtd_notas_entrada')}/mês)"
                     elif item == "Escrituração de Notas Fiscais de Saída" and dados_form.get("qtd_notas_saida"):
                         texto_extra = f" (Quantidade Média: {dados_form.get('qtd_notas_saida')}/mês)"
+                    elif item == "Emissão de notas fiscais de serviços" and dados_form.get("qtd_emissao_notas_servico"):
+                        texto_extra = f" (Quantidade Média: {dados_form.get('qtd_emissao_notas_servico')}/mês)"
+                    elif item == "Emissão de notas fiscais eletrônicas de produtos" and dados_form.get("qtd_emissao_notas_produto"):
+                        texto_extra = f" (Quantidade Média: {dados_form.get('qtd_emissao_notas_produto')}/mês)"
+                    elif item == "ICMS Incentivado" and dados_form.get("tipos_icms_incentivado"):
+                        texto_extra = f" - Opções: {', '.join(dados_form.get('tipos_icms_incentivado', []))}"
                     
                     self.multi_cell(0, 6, f"[X] {item}{texto_extra}")
                 self.ln(4)
