@@ -143,7 +143,9 @@ itens_contabeis = [
     "Demonstração do Valor Adicionado (DVA)",
     "Elaboração de Notas Explicativas",
     "Entrega de SPED Contábil (ECD)",
-    "Entrega de ECF"
+    "Entrega de ECF",
+    "Apuração de IRPJ e CSLL Lucro Real (Trimestral)",
+    "Apuração de IRPJ e CSLL Lucro Real (Anual)"
 ]
 
 itens_dp = [
