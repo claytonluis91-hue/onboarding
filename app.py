@@ -104,31 +104,35 @@ OPCOES_TTS = [
     "TTS/Operador Logístico e TTS/Industria"
 ]
 
-itens_fiscais = [
+coluna_1_fisc = [
     "Escrituração de Notas Fiscais de Entrada",
     "Escrituração de Notas Fiscais de Saída",
     "Escrituração de Notas de Serviços Prestados",
     "Escrituração de Notas de Serviços Tomados",
     "Emissão de notas fiscais de serviços",
     "Emissão de notas fiscais eletrônicas de produtos",
-    "ICMS Incentivado",
-    "Consultas Tributárias",
-    "Dúvidas Tributárias",
-    "Acompanhamento de CND Federal",
-    "Acompanhamento de CND Estadual",
-    "Acompanhamento de CND Municipal",
+    "ICMS Incentivado"
+]
+
+coluna_2_fisc = [
     "Apuração: DAS",
     "Apuração: ICMS",
     "Apuração: ICMS-ST",
     "Apuração: ISS",
     "Apuração: PIS",
-    "Apuração: COFINS",
+    "Apuração: COFINS"
+]
+
+coluna_3_fisc = [
     "Apuração: IRPJ",
     "Apuração: CSLL",
     "Apuração: IPI",
     "Apuração: IRRF",
     "Apuração: CSRF",
-    "Apuração: INSS Retido",
+    "Apuração: INSS Retido"
+]
+
+coluna_4_fisc = [
     "Entrega: DCTFWeb",
     "Entrega: SPED Fiscal",
     "Entrega: SPED Contribuições",
@@ -136,11 +140,18 @@ itens_fiscais = [
     "Entrega: PGDAS-D",
     "Entrega: GIA / GIA-ST",
     "Entrega: SINTEGRA",
+    "Consultas Tributárias",
+    "Dúvidas Tributárias",
+    "Acompanhamento de CND Federal",
+    "Acompanhamento de CND Estadual",
+    "Acompanhamento de CND Municipal",
     "Atendimento a fiscalizações e malhas fiscais",
     "Recálculo de Guias",
     "Recálculo de Parcelamentos",
     "Simulação de Parcelamentos"
 ]
+
+itens_fiscais = coluna_1_fisc + coluna_2_fisc + coluna_3_fisc + coluna_4_fisc
 
 itens_contabeis = [
     "Processamento e Conciliação Bancária",
@@ -274,40 +285,44 @@ with tab3:
     st.write("")
     
     cols_fiscal = st.columns(4)
-    for i, item in enumerate(itens_fiscais):
-        col = cols_fiscal[i % 4]
-        
-        # O checkbox usando a chave direta do session state e on_change
-        col.checkbox(item, key=f"fisc_{i}", on_change=update_cb_fiscal, args=(i, item))
-        
-        # Se for Entradas ou Saídas, e estiver marcado, mostra o input
-        if st.session_state[f"fisc_{i}"]:
-            if item == "Escrituração de Notas Fiscais de Entrada":
-                val = st.session_state.form_data.get("qtd_notas_entrada", "")
-                st.session_state.form_data["qtd_notas_entrada"] = col.text_input("Qtd média Entradas", value=val, key="in_qtd_ent")
-            elif item == "Escrituração de Notas Fiscais de Saída":
-                val = st.session_state.form_data.get("qtd_notas_saida", "")
-                st.session_state.form_data["qtd_notas_saida"] = col.text_input("Qtd média Saídas", value=val, key="in_qtd_sai")
-            elif item == "Emissão de notas fiscais de serviços":
-                val = st.session_state.form_data.get("qtd_emissao_notas_servico", "")
-                st.session_state.form_data["qtd_emissao_notas_servico"] = col.text_input("Qtd Emissão Serviços", value=val, key="in_qtd_emis_serv")
-            elif item == "Emissão de notas fiscais eletrônicas de produtos":
-                val = st.session_state.form_data.get("qtd_emissao_notas_produto", "")
-                st.session_state.form_data["qtd_emissao_notas_produto"] = col.text_input("Qtd Emissão Produtos", value=val, key="in_qtd_emis_prod")
-            elif item == "ICMS Incentivado":
-                selecionados = col.multiselect(
-                    "Selecione os incentivos (TTS):",
-                    options=OPCOES_TTS,
-                    default=st.session_state.form_data.get("tipos_icms_incentivado", [])
-                )
-                st.session_state.form_data["tipos_icms_incentivado"] = selecionados
-            elif item == "Apuração: ICMS-ST":
-                estados_selecionados = col.multiselect(
-                    "Estados ICMS-ST:",
-                    options=ESTADOS,
-                    default=st.session_state.form_data.get("estados_icms_st", [])
-                )
-                st.session_state.form_data["estados_icms_st"] = estados_selecionados
+    listas_colunas_fiscais = [coluna_1_fisc, coluna_2_fisc, coluna_3_fisc, coluna_4_fisc]
+    
+    for col_idx, lista in enumerate(listas_colunas_fiscais):
+        with cols_fiscal[col_idx]:
+            for item in lista:
+                i = itens_fiscais.index(item)
+                
+                # O checkbox usando a chave direta do session state e on_change
+                st.checkbox(item, key=f"fisc_{i}", on_change=update_cb_fiscal, args=(i, item))
+                
+                # Se estiver marcado, mostra o input dependente
+                if st.session_state[f"fisc_{i}"]:
+                    if item == "Escrituração de Notas Fiscais de Entrada":
+                        val = st.session_state.form_data.get("qtd_notas_entrada", "")
+                        st.session_state.form_data["qtd_notas_entrada"] = st.text_input("Qtd média Entradas", value=val, key="in_qtd_ent")
+                    elif item == "Escrituração de Notas Fiscais de Saída":
+                        val = st.session_state.form_data.get("qtd_notas_saida", "")
+                        st.session_state.form_data["qtd_notas_saida"] = st.text_input("Qtd média Saídas", value=val, key="in_qtd_sai")
+                    elif item == "Emissão de notas fiscais de serviços":
+                        val = st.session_state.form_data.get("qtd_emissao_notas_servico", "")
+                        st.session_state.form_data["qtd_emissao_notas_servico"] = st.text_input("Qtd Emissão Serviços", value=val, key="in_qtd_emis_serv")
+                    elif item == "Emissão de notas fiscais eletrônicas de produtos":
+                        val = st.session_state.form_data.get("qtd_emissao_notas_produto", "")
+                        st.session_state.form_data["qtd_emissao_notas_produto"] = st.text_input("Qtd Emissão Produtos", value=val, key="in_qtd_emis_prod")
+                    elif item == "ICMS Incentivado":
+                        selecionados = st.multiselect(
+                            "Selecione os incentivos (TTS):",
+                            options=OPCOES_TTS,
+                            default=st.session_state.form_data.get("tipos_icms_incentivado", [])
+                        )
+                        st.session_state.form_data["tipos_icms_incentivado"] = selecionados
+                    elif item == "Apuração: ICMS-ST":
+                        estados_selecionados = st.multiselect(
+                            "Estados ICMS-ST:",
+                            options=ESTADOS,
+                            default=st.session_state.form_data.get("estados_icms_st", [])
+                        )
+                        st.session_state.form_data["estados_icms_st"] = estados_selecionados
 
     st.divider()
     st.subheader("Escopo: Contabilidade")
