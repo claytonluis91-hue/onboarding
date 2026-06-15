@@ -1,0 +1,17 @@
+# Arquivos de banco de dados locais
+banco_dados.db
+
+# Arquivos Python e cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.pdf
+
+# Pastas de ambiente virtual
+venv/
+env/
+.env
+
+# Arquivos do sistema
+.DS_Store
+Thumbs.db
