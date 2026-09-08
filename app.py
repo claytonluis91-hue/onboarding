@@ -47,11 +47,54 @@ def formatar_data_br(valor):
             continue
     return texto
 
+def formatar_periodo(valor):
+    """Formata mês/ano como MM/AAAA, inserindo a barra automaticamente."""
+    digitos = re.sub(r"\D", "", str(valor or ""))[:6]
+    if len(digitos) <= 2:
+        return digitos
+    return f"{digitos[:2]}/{digitos[2:]}"
+
+def periodo_valido(valor):
+    digitos = re.sub(r"\D", "", str(valor or ""))
+    return not digitos or (len(digitos) == 6 and 1 <= int(digitos[:2]) <= 12)
+
+def formatar_telefone(valor):
+    """Reconhece telefones brasileiros com 10 ou 11 dígitos."""
+    digitos = re.sub(r"\D", "", str(valor or ""))
+    if len(digitos) in (12, 13) and digitos.startswith("55"):
+        digitos = digitos[2:]
+    digitos = digitos[:11]
+    if len(digitos) == 11:
+        return f"({digitos[:2]}) {digitos[2:7]}-{digitos[7:]}"
+    if len(digitos) == 10:
+        return f"({digitos[:2]}) {digitos[2:6]}-{digitos[6:]}"
+    return digitos
+
+def telefone_valido(valor):
+    digitos = re.sub(r"\D", "", str(valor or ""))
+    if len(digitos) in (12, 13) and digitos.startswith("55"):
+        digitos = digitos[2:]
+    return not digitos or len(digitos) in (10, 11)
+
+def formatar_widget(chave, formatador):
+    st.session_state[chave] = formatador(st.session_state.get(chave, ""))
+
 def email_valido(email):
     return not email or re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email.strip()) is not None
 
 def contato_preenchido(contato):
-    return any(str(contato.get(campo, "")).strip() for campo in ("Nome", "E-mail", "WhatsApp"))
+    return any(str(contato.get(campo, "")).strip() for campo in ("Nome", "E-mail", "Telefone", "WhatsApp"))
+
+def normalizar_contato(contato):
+    """Migra contatos antigos, nos quais WhatsApp armazenava o número."""
+    whatsapp_legado = contato.get("WhatsApp", False)
+    if not contato.get("Telefone") and isinstance(whatsapp_legado, str):
+        contato["Telefone"] = formatar_telefone(whatsapp_legado)
+        contato["WhatsApp"] = bool(whatsapp_legado.strip())
+    else:
+        contato["Telefone"] = formatar_telefone(contato.get("Telefone", ""))
+        contato["WhatsApp"] = bool(whatsapp_legado)
+    return contato
 
 def buscar_cnpj():
     cnpj_limpo = limpar_cnpj(st.session_state.cnpj_input)
@@ -69,6 +112,9 @@ def buscar_cnpj():
         st.session_state.form_data = dados_banco
         st.session_state.form_data["data_abertura"] = formatar_data_br(
             st.session_state.form_data.get("data_abertura", "")
+        )
+        st.session_state["periodo_cliente_input"] = formatar_periodo(
+            st.session_state.form_data.get("data_inicio_cliente", "")
         )
         st.success("Dados carregados do banco local (Rascunho anterior encontrado)!")
         return
@@ -281,7 +327,24 @@ with tab1:
     st.divider()
     st.subheader("Informações do Contrato")
     c6, c7 = st.columns(2)
-    st.session_state.form_data["data_inicio_cliente"] = c6.text_input("Cliente a partir de (Mês/Ano)", value=st.session_state.form_data.get("data_inicio_cliente", ""))
+    if "periodo_cliente_input" not in st.session_state:
+        st.session_state.periodo_cliente_input = formatar_periodo(
+            st.session_state.form_data.get("data_inicio_cliente", "")
+        )
+    c6.text_input(
+        "Cliente a partir de (Mês/Ano)",
+        key="periodo_cliente_input",
+        placeholder="MM/AAAA",
+        help="Digite apenas mês e ano; a barra será inserida automaticamente.",
+        max_chars=7,
+        on_change=formatar_widget,
+        args=("periodo_cliente_input", formatar_periodo)
+    )
+    st.session_state.form_data["data_inicio_cliente"] = formatar_periodo(
+        st.session_state.periodo_cliente_input
+    )
+    if not periodo_valido(st.session_state.form_data["data_inicio_cliente"]):
+        c6.warning("Informe um período válido no formato MM/AAAA.")
     idx_regime = REGIMES.index(st.session_state.form_data.get("regime_tributario", "Simples Nacional")) if st.session_state.form_data.get("regime_tributario") in REGIMES else 1
     st.session_state.form_data["regime_tributario"] = c7.selectbox("Regime Tributário", REGIMES, index=idx_regime)
 
@@ -295,9 +358,13 @@ with tab2:
             c_nome, c_setor = st.columns([2, 1])
             novo_nome = c_nome.text_input("Nome completo *", placeholder="Ex.: Maria Silva")
             novo_setor = c_setor.selectbox("Setor *", SETORES)
-            c_email, c_whatsapp = st.columns(2)
+            c_email, c_telefone = st.columns(2)
             novo_email = c_email.text_input("E-mail", placeholder="nome@empresa.com.br")
-            novo_whatsapp = c_whatsapp.text_input("WhatsApp", placeholder="(47) 99999-9999")
+            novo_telefone = c_telefone.text_input(
+                "Telefone", placeholder="(47) 99999-9999",
+                help="Aceita 10 ou 11 dígitos e aplica a formatação brasileira."
+            )
+            novo_whatsapp = st.checkbox("Este telefone possui WhatsApp", value=True)
             adicionar_contato = st.form_submit_button(
                 "➕ Adicionar contato", type="primary", use_container_width=True
             )
@@ -307,20 +374,20 @@ with tab2:
                 st.error("Informe o nome do contato.")
             elif not email_valido(novo_email):
                 st.error("Confira o e-mail informado.")
+            elif not telefone_valido(novo_telefone):
+                st.error("Informe o telefone com DDD e 10 ou 11 dígitos.")
             else:
                 st.session_state.form_data.setdefault("contatos", []).append({
                     "_id": uuid4().hex,
                     "Nome": novo_nome.strip(),
                     "Setor": novo_setor,
                     "E-mail": novo_email.strip(),
-                    "WhatsApp": novo_whatsapp.strip()
+                    "Telefone": formatar_telefone(novo_telefone),
+                    "WhatsApp": novo_whatsapp
                 })
                 st.success(f"Contato {novo_nome.strip()} adicionado.")
 
-    contatos_atuais = [
-        contato for contato in st.session_state.form_data.get("contatos", [])
-        if contato_preenchido(contato)
-    ]
+    contatos_atuais = [normalizar_contato(contato) for contato in st.session_state.form_data.get("contatos", []) if contato_preenchido(contato)]
     for contato in contatos_atuais:
         contato.setdefault("_id", uuid4().hex)
     st.session_state.form_data["contatos"] = contatos_atuais
@@ -339,9 +406,24 @@ with tab2:
                 setor_atual = contato.get("Setor", SETORES[0])
                 setor_idx = SETORES.index(setor_atual) if setor_atual in SETORES else 0
                 contato["Setor"] = e_setor.selectbox("Setor", SETORES, index=setor_idx, key=f"contato_setor_{contato_id}")
-                e_email, e_whatsapp = st.columns(2)
+                e_email, e_telefone = st.columns(2)
                 contato["E-mail"] = e_email.text_input("E-mail", value=contato.get("E-mail", ""), key=f"contato_email_{contato_id}")
-                contato["WhatsApp"] = e_whatsapp.text_input("WhatsApp", value=contato.get("WhatsApp", ""), key=f"contato_whatsapp_{contato_id}")
+                chave_telefone = f"contato_telefone_{contato_id}"
+                contato["Telefone"] = formatar_telefone(e_telefone.text_input(
+                    "Telefone",
+                    value=contato.get("Telefone", ""),
+                    key=chave_telefone,
+                    placeholder="(47) 99999-9999",
+                    on_change=formatar_widget,
+                    args=(chave_telefone, formatar_telefone)
+                ))
+                contato["WhatsApp"] = st.checkbox(
+                    "Este telefone possui WhatsApp",
+                    value=bool(contato.get("WhatsApp", False)),
+                    key=f"contato_whatsapp_{contato_id}"
+                )
+                if contato.get("Telefone") and not telefone_valido(contato["Telefone"]):
+                    st.warning("Confira o telefone: informe DDD e 10 ou 11 dígitos.")
                 if st.button("🗑️ Excluir contato", key=f"excluir_contato_{contato_id}"):
                     indice_excluir = i
 

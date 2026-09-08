@@ -26,6 +26,22 @@ def formatar_cnpj(valor):
         return f"{digitos[:2]}.{digitos[2:5]}.{digitos[5:8]}/{digitos[8:12]}-{digitos[12:]}"
     return str(valor or "Não informado")
 
+def formatar_periodo(valor):
+    digitos = "".join(filter(str.isdigit, str(valor or "")))[:6]
+    if len(digitos) == 6:
+        return f"{digitos[:2]}/{digitos[2:]}"
+    return str(valor or "Não informado")
+
+def formatar_telefone(valor):
+    digitos = "".join(filter(str.isdigit, str(valor or "")))
+    if len(digitos) in (12, 13) and digitos.startswith("55"):
+        digitos = digitos[2:]
+    if len(digitos) == 11:
+        return f"({digitos[:2]}) {digitos[2:7]}-{digitos[7:]}"
+    if len(digitos) == 10:
+        return f"({digitos[:2]}) {digitos[2:6]}-{digitos[6:]}"
+    return str(valor or "Não informado")
+
 class FichaClientePDF(FPDF):
     def __init__(self, logo_path=None):
         super().__init__(orientation="P", unit="mm", format="A4")
@@ -122,7 +138,7 @@ class FichaClientePDF(FPDF):
         self.desenhar_linha_chave_valor("Nome Fantasia", dados.get("nome_fantasia", ""))
         self.desenhar_linha_chave_valor("CNAE Principal", dados.get("cnae_principal", ""))
         self.desenhar_linha_chave_valor("Endereço", dados.get("endereco", ""))
-        self.desenhar_linha_chave_valor("Início Cliente em", dados.get("data_inicio_cliente", ""))
+        self.desenhar_linha_chave_valor("Início Cliente em", formatar_periodo(dados.get("data_inicio_cliente", "")))
         
         # Borda inferior
         self.cell(0, 0, "", border="T", ln=1)
@@ -145,18 +161,25 @@ class FichaClientePDF(FPDF):
         self.set_font("helvetica", "B", 9)
         self.set_fill_color(*CINZA_NASCEL)
         self.set_text_color(*BRANCO)
-        self.cell(47, 7, "Nome", border=1, ln=0, fill=True)
-        self.cell(35, 7, "Setor", border=1, ln=0, fill=True)
-        self.cell(62, 7, "E-mail", border=1, ln=0, fill=True)
+        self.cell(43, 7, "Nome", border=1, ln=0, fill=True)
+        self.cell(31, 7, "Setor", border=1, ln=0, fill=True)
+        self.cell(52, 7, "E-mail", border=1, ln=0, fill=True)
+        self.cell(34, 7, "Telefone", border=1, ln=0, fill=True)
         self.cell(0, 7, "WhatsApp", border=1, ln=1, fill=True)
         
         self.set_text_color(*CINZA_TEXTO)
         self.set_font("helvetica", "", 9)
         for contato in tabela_contatos:
-            self.cell(47, 7, str(contato.get("Nome", ""))[:28], border=1, ln=0)
-            self.cell(35, 7, str(contato.get("Setor", ""))[:20], border=1, ln=0)
-            self.cell(62, 7, str(contato.get("E-mail", ""))[:38], border=1, ln=0)
-            self.cell(0, 7, str(contato.get("WhatsApp", ""))[:20], border=1, ln=1)
+            whatsapp = contato.get("WhatsApp", False)
+            telefone = contato.get("Telefone", "")
+            if not telefone and isinstance(whatsapp, str):
+                telefone = whatsapp
+                whatsapp = bool(whatsapp.strip())
+            self.cell(43, 7, str(contato.get("Nome", ""))[:25], border=1, ln=0)
+            self.cell(31, 7, str(contato.get("Setor", ""))[:18], border=1, ln=0)
+            self.cell(52, 7, str(contato.get("E-mail", ""))[:31], border=1, ln=0)
+            self.cell(34, 7, formatar_telefone(telefone)[:20], border=1, ln=0)
+            self.cell(0, 7, "Sim" if whatsapp else "Não", border=1, ln=1, align="C")
         self.ln(3)
 
     def add_bloco_resumo_escopo(self, dict_escopo_macro):
