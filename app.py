@@ -1,9 +1,8 @@
 import streamlit as st
 import requests
 import re
-import pandas as pd
-import json
-import os
+from datetime import datetime
+from uuid import uuid4
 from database import save_client_data, load_client_data
 from pdf_generator import gerar_pdf
 
@@ -36,6 +35,24 @@ if "form_data" not in st.session_state:
 def limpar_cnpj(cnpj):
     return re.sub(r'[^0-9]', '', cnpj)
 
+def formatar_data_br(valor):
+    """Normaliza datas conhecidas para DD/MM/AAAA sem apagar valores legados."""
+    if not valor:
+        return ""
+    texto = str(valor).strip()
+    for formato in ("%Y-%m-%d", "%d/%m/%Y", "%Y-%m-%dT%H:%M:%S"):
+        try:
+            return datetime.strptime(texto, formato).strftime("%d/%m/%Y")
+        except ValueError:
+            continue
+    return texto
+
+def email_valido(email):
+    return not email or re.fullmatch(r"[^\s@]+@[^\s@]+\.[^\s@]+", email.strip()) is not None
+
+def contato_preenchido(contato):
+    return any(str(contato.get(campo, "")).strip() for campo in ("Nome", "E-mail", "WhatsApp"))
+
 def buscar_cnpj():
     cnpj_limpo = limpar_cnpj(st.session_state.cnpj_input)
     if len(cnpj_limpo) != 14:
@@ -50,6 +67,9 @@ def buscar_cnpj():
             if key not in dados_banco:
                 dados_banco[key] = st.session_state.form_data[key]
         st.session_state.form_data = dados_banco
+        st.session_state.form_data["data_abertura"] = formatar_data_br(
+            st.session_state.form_data.get("data_abertura", "")
+        )
         st.success("Dados carregados do banco local (Rascunho anterior encontrado)!")
         return
 
@@ -68,7 +88,7 @@ def buscar_cnpj():
                 "cnpj": cnpj_limpo,
                 "razao_social": data.get("razao_social", ""),
                 "nome_fantasia": data.get("nome_fantasia", ""),
-                "data_abertura": data.get("data_inicio_atividade", ""),
+                "data_abertura": formatar_data_br(data.get("data_inicio_atividade", "")),
                 "cnae_principal": f"{data.get('cnae_fiscal', '')} - {data.get('cnae_fiscal_descricao', '')}",
                 "endereco": endereco
             })
@@ -248,7 +268,12 @@ with tab1:
     
     c4, c5 = st.columns([2, 1])
     st.session_state.form_data["nome_fantasia"] = c4.text_input("Nome Fantasia", value=st.session_state.form_data.get("nome_fantasia", ""))
-    st.session_state.form_data["data_abertura"] = c5.text_input("Data de Abertura", value=st.session_state.form_data.get("data_abertura", ""))
+    st.session_state.form_data["data_abertura"] = c5.text_input(
+        "Data de Abertura",
+        value=formatar_data_br(st.session_state.form_data.get("data_abertura", "")),
+        placeholder="DD/MM/AAAA",
+        help="Use o formato dia/mês/ano. Exemplo: 18/08/2020."
+    )
     
     st.session_state.form_data["cnae_principal"] = st.text_input("CNAE Principal", value=st.session_state.form_data.get("cnae_principal", ""))
     st.session_state.form_data["endereco"] = st.text_input("Endereço Completo", value=st.session_state.form_data.get("endereco", ""))
@@ -262,22 +287,69 @@ with tab1:
 
 with tab2:
     st.subheader("Contatos dos Responsáveis")
-    contatos_atuais = st.session_state.form_data.get("contatos", [])
-    if not contatos_atuais:
-        contatos_atuais = [{"Nome": "", "Setor": "Sócio/Diretor", "E-mail": "", "WhatsApp": ""}]
-    
-    df_contatos = pd.DataFrame(contatos_atuais)
-    edited_df = st.data_editor(
-        df_contatos,
-        num_rows="dynamic",
-        column_config={
-            "Setor": st.column_config.SelectboxColumn(
-                "Setor", help="Selecione o setor", options=SETORES, required=True
+    st.caption("Cadastre uma pessoa por vez. Depois, revise ou exclua os contatos na lista abaixo.")
+
+    with st.container(border=True):
+        st.markdown("**Adicionar novo contato**")
+        with st.form("form_novo_contato", clear_on_submit=True):
+            c_nome, c_setor = st.columns([2, 1])
+            novo_nome = c_nome.text_input("Nome completo *", placeholder="Ex.: Maria Silva")
+            novo_setor = c_setor.selectbox("Setor *", SETORES)
+            c_email, c_whatsapp = st.columns(2)
+            novo_email = c_email.text_input("E-mail", placeholder="nome@empresa.com.br")
+            novo_whatsapp = c_whatsapp.text_input("WhatsApp", placeholder="(47) 99999-9999")
+            adicionar_contato = st.form_submit_button(
+                "➕ Adicionar contato", type="primary", use_container_width=True
             )
-        },
-        use_container_width=True
-    )
-    st.session_state.form_data["contatos"] = edited_df.to_dict('records')
+
+        if adicionar_contato:
+            if not novo_nome.strip():
+                st.error("Informe o nome do contato.")
+            elif not email_valido(novo_email):
+                st.error("Confira o e-mail informado.")
+            else:
+                st.session_state.form_data.setdefault("contatos", []).append({
+                    "_id": uuid4().hex,
+                    "Nome": novo_nome.strip(),
+                    "Setor": novo_setor,
+                    "E-mail": novo_email.strip(),
+                    "WhatsApp": novo_whatsapp.strip()
+                })
+                st.success(f"Contato {novo_nome.strip()} adicionado.")
+
+    contatos_atuais = [
+        contato for contato in st.session_state.form_data.get("contatos", [])
+        if contato_preenchido(contato)
+    ]
+    for contato in contatos_atuais:
+        contato.setdefault("_id", uuid4().hex)
+    st.session_state.form_data["contatos"] = contatos_atuais
+
+    st.markdown(f"**Contatos cadastrados ({len(contatos_atuais)})**")
+    if not contatos_atuais:
+        st.info("Nenhum contato cadastrado ainda. Use o formulário acima para começar.")
+    else:
+        indice_excluir = None
+        for i, contato in enumerate(contatos_atuais):
+            contato_id = contato["_id"]
+            titulo = f"{contato.get('Nome', 'Contato')} · {contato.get('Setor', 'Sem setor')}"
+            with st.expander(titulo, expanded=False):
+                e_nome, e_setor = st.columns([2, 1])
+                contato["Nome"] = e_nome.text_input("Nome completo", value=contato.get("Nome", ""), key=f"contato_nome_{contato_id}")
+                setor_atual = contato.get("Setor", SETORES[0])
+                setor_idx = SETORES.index(setor_atual) if setor_atual in SETORES else 0
+                contato["Setor"] = e_setor.selectbox("Setor", SETORES, index=setor_idx, key=f"contato_setor_{contato_id}")
+                e_email, e_whatsapp = st.columns(2)
+                contato["E-mail"] = e_email.text_input("E-mail", value=contato.get("E-mail", ""), key=f"contato_email_{contato_id}")
+                contato["WhatsApp"] = e_whatsapp.text_input("WhatsApp", value=contato.get("WhatsApp", ""), key=f"contato_whatsapp_{contato_id}")
+                if st.button("🗑️ Excluir contato", key=f"excluir_contato_{contato_id}"):
+                    indice_excluir = i
+
+        if indice_excluir is not None:
+            removido = contatos_atuais.pop(indice_excluir)
+            st.session_state.form_data["contatos"] = contatos_atuais
+            st.success(f"Contato {removido.get('Nome', '')} excluído.")
+            st.rerun()
 
 with tab3:
     st.subheader("Escopo: Compliance Fiscal")
